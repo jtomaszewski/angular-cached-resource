@@ -170,17 +170,20 @@ app.factory '$cachedResource', ['$resource', '$timeout', '$q', '$log', ($resourc
 
       @$resource: Resource
       @$key: $key
+      @_actions: actions
 
-    for name, params of actions
-      handler = if params.method is 'GET' and params.isArray
+    for name, actionOptions of actions
+      handler = if actionOptions.cache?
+          Resource[name]
+        else if actionOptions.method is 'GET' and actionOptions.isArray
           readArrayCache(name, CachedResource, boundParams)
-        else if params.method is 'GET'
+        else if actionOptions.method is 'GET'
           readCache(name, CachedResource)
-        else if params.method in ['POST', 'PUT', 'DELETE']
+        else if actionOptions.method in ['POST', 'PUT', 'DELETE']
           writeCache(name, CachedResource)
 
       CachedResource[name] = handler
-      CachedResource::["$#{name}"] = handler unless params.method is 'GET'
+      CachedResource::["$#{name}"] = handler unless actionOptions.method is 'GET'
 
     resourceManager.add(CachedResource)
     resourceManager.flushQueues()
