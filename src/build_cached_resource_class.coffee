@@ -9,11 +9,12 @@ readArrayCache = require './read_array_cache'
 readCache = require './read_cache'
 writeCache = require './write_cache'
 
-module.exports = buildCachedResourceClass = ($resource, $timeout, $q, log, args) ->
-  ResourceCacheEntry = require('./resource_cache_entry')(log)
-  ResourceCacheArrayEntry = require('./resource_cache_array_entry')(log)
-  ResourceWriteQueue = require('./resource_write_queue')(log, $q)
-  Cache = require('./cache')(log)
+module.exports = buildCachedResourceClass = ($resource, $timeout, $q, providerParams, args) ->
+  {$log} = providerParams
+  ResourceCacheEntry = require('./resource_cache_entry')(providerParams)
+  ResourceCacheArrayEntry = require('./resource_cache_array_entry')(providerParams)
+  ResourceWriteQueue = require('./resource_write_queue')(providerParams, $q)
+  Cache = require('./cache')(providerParams)
 
   $key = args.shift()
   url = args.shift()
@@ -59,7 +60,7 @@ module.exports = buildCachedResourceClass = ($resource, $timeout, $q, log, args)
       isArray ?= false
       clearChildren ?= false
 
-      return log.error "Using where and exceptFor arguments at once in $clearCache() method is forbidden!" if where && exceptFor
+      return $log.error "Using where and exceptFor arguments at once in $clearCache() method is forbidden!" if where && exceptFor
 
       cacheKeys = []
 
@@ -97,7 +98,7 @@ module.exports = buildCachedResourceClass = ($resource, $timeout, $q, log, args)
         entries = queue.map (resource) -> resource.resourceParams
         cacheKeys = cacheKeys.concat translateEntriesToCacheKeys(entries)
       else if clearPendingWrites && where
-        log.debug "TODO if clearPendingWrites && where"
+        $log.debug "TODO if clearPendingWrites && where"
         # TODO clear only those writes, which match :where parameter
 
       if where
@@ -123,11 +124,11 @@ module.exports = buildCachedResourceClass = ($resource, $timeout, $q, log, args)
     method = params.method.toUpperCase()
     unless params.cache is false
       handler = if method is 'GET' and params.isArray
-          readArrayCache($q, log, name, CachedResource)
+          readArrayCache($q, providerParams, name, CachedResource)
         else if method is 'GET'
-          readCache($q, log, name, CachedResource)
+          readCache($q, providerParams, name, CachedResource)
         else if method in ['POST', 'PUT', 'DELETE', 'PATCH']
-          writeCache($q, log, name, CachedResource)
+          writeCache($q, providerParams, name, CachedResource)
 
       CachedResource[name] = handler
       CachedResource::["$#{name}"] = handler unless method is 'GET'

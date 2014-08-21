@@ -1,46 +1,37 @@
-LOCAL_STORAGE_PREFIX = 'cachedResource://'
 {localStorage} = window
 
-memoryCache = {}
+class Cache
+  memoryCache: {}
 
-buildKey = (key) ->
-  "#{LOCAL_STORAGE_PREFIX}#{key}"
+  constructor: ({@$log, @localStoragePrefix}) ->
 
-cacheKeyHasPrefix = (cacheKey, prefix) ->
-  return cacheKey.indexOf(LOCAL_STORAGE_PREFIX) is 0 unless prefix?
-  prefix = buildKey prefix
-  index = cacheKey.indexOf prefix
-  nextChar = cacheKey[prefix.length]
-  index is 0 and (not nextChar? or nextChar in ['?', '/'])
-
-module.exports = (log) ->
   getItem: (key, fallbackValue) ->
-    key = buildKey key
+    key = @_buildKey key
 
-    item = memoryCache[key]
+    item = @memoryCache[key]
     item ?= localStorage.getItem key
 
     out = if item? then angular.fromJson(item) else fallbackValue
-    log.debug "CACHE GET: #{key}", out
+    @$log.debug "CACHE GET: #{key}", out
 
     out
 
   setItem: (key, value) ->
-    key = buildKey key
+    key = @_buildKey key
     stringValue = angular.toJson value
 
     try
       localStorage.setItem(key, stringValue)
-      delete memoryCache[key] if memoryCache[key]?
+      delete @memoryCache[key] if @memoryCache[key]?
     catch
-      memoryCache[key] = stringValue
+      @memoryCache[key] = stringValue
 
-    log.debug "CACHE PUT: #{key}", angular.fromJson angular.toJson value
+    @$log.debug "CACHE PUT: #{key}", angular.fromJson angular.toJson value
 
     value
 
   clear: ({key, exceptFor, where} = {}) ->
-    return log.error "Using where and exceptFor arguments at once in clear() method is forbidden!" if where && exceptFor
+    return @$log.error "Using where and exceptFor arguments at once in clear() method is forbidden!" if where && exceptFor
 
     if exceptFor
       exceptFor ?= []
@@ -48,10 +39,10 @@ module.exports = (log) ->
       cacheKeys = []
       for i in [0...localStorage.length]
         cacheKey = localStorage.key i
-        continue unless cacheKeyHasPrefix(cacheKey, key)
+        continue unless @_cacheKeyHasPrefix(cacheKey, key)
 
         skipKey = no
-        for exception in exceptFor when cacheKeyHasPrefix(cacheKey, exception)
+        for exception in exceptFor when @_cacheKeyHasPrefix(cacheKey, exception)
           skipKey = yes
           break
 
@@ -59,7 +50,23 @@ module.exports = (log) ->
 
         cacheKeys.push cacheKey
 
-      localStorage.removeItem(cacheKey) for cacheKey in cacheKeys
+      for cacheKey in cacheKeys
+        localStorage.removeItem(cacheKey)
     else
       for cacheKey in where
-        localStorage.removeItem(LOCAL_STORAGE_PREFIX + cacheKey)
+        prefixedCacheKey = @_buildKey(cacheKey)
+        localStorage.removeItem(prefixedCacheKey)
+
+  _buildKey: (key) ->
+    "#{@localStoragePrefix}#{key}"
+
+  _cacheKeyHasPrefix: (cacheKey, prefix) ->
+    return cacheKey.indexOf(@localStoragePrefix) is 0 unless prefix?
+    prefix = @_buildKey prefix
+    index = cacheKey.indexOf prefix
+    nextChar = cacheKey[prefix.length]
+    index is 0 and (not nextChar? or nextChar in ['?', '/'])
+
+
+module.exports = (providerParams) ->
+  new Cache(providerParams)
